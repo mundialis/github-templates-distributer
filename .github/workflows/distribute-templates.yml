@@ -1,0 +1,191 @@
+name: Distribute repository templates
+
+on:
+  workflow_dispatch:
+    inputs:
+      repositories:
+        description: "Repositories (owner/repo, separated by spaces)"
+        required: true
+        type: string
+
+      use_forks:
+        description: "Create branches in personal forks instead of target repositories"
+        type: boolean
+        default: true
+
+      profile:
+        description: "Select a profile and/or individual templates below"
+        required: true
+        default: "None - Individual templates only"
+        type: choice
+        options:
+          - "None - Individual templates only"
+          - "General - CodeQL, Linting, SBOM, Third-Party Licenses, AGENTS.md, CONTRIBUTING.md"
+          - "GRASS - General + GRASS Manual and GRASS Test"
+          - "Python - General + Post PR Reviews and Python Publish"
+          - "Quality - CodeQL, Linting, Post PR Reviews"
+          - "Security - CodeQL, SBOM, Third-Party Licenses, SECURITY.md"
+          - "Collaboration - SECURITY.md, AGENTS.md, CONTRIBUTING.md"
+          - "All - All templates"
+
+      # Individual templates
+      template_codeql:
+        description: "Individual - CodeQL"
+        type: boolean
+        default: false
+
+      template_sbom:
+        description: "Individual - SBOM Vulnerability Scan"
+        type: boolean
+        default: false
+
+      template_licenses:
+        description: "Individual - Third-Party Licenses"
+        type: boolean
+        default: false
+
+      template_grass_manual:
+        description: "Individual - GRASS Manual"
+        type: boolean
+        default: false
+
+      template_grass_test:
+        description: "Individual - GRASS Test"
+        type: boolean
+        default: false
+
+      template_linting:
+        description: "Individual - Linting"
+        type: boolean
+        default: false
+
+      template_post_pr_reviews:
+        description: "Individual - Post PR Reviews"
+        type: boolean
+        default: false
+
+      template_python_publish:
+        description: "Individual - Python Publish"
+        type: boolean
+        default: false
+
+      template_security_md:
+        description: "Individual - SECURITY.md"
+        type: boolean
+        default: false
+
+      template_agents_md:
+        description: "Individual - AGENTS.md"
+        type: boolean
+        default: false
+
+      template_contributing_md:
+        description: "Individual - CONTRIBUTING.md"
+        type: boolean
+        default: false
+
+jobs:
+  distribute-templates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout distributer
+        uses: actions/checkout@v4
+
+      - name: Checkout templates
+        uses: actions/checkout@v4
+        with:
+          repository: mundialis/github-templates
+          ref: main
+          path: templates-source
+
+      - name: Install Multi-Gitter
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/lindell/multi-gitter/master/install.sh | sh
+
+      - name: Install Python dependencies
+        run: python3 -m pip install -r requirements.txt
+
+      - name: Distribute templates
+        env:
+          GITHUB_TOKEN: ${{ secrets.MULTI_GITTER_TOKEN }}
+          TEMPLATES_DIR: ${{ github.workspace }}/templates-source/templates
+          REPOSITORIES: ${{ inputs.repositories }}
+          SELECTED_PROFILE: ${{ inputs.profile }}
+          USE_FORKS: ${{ inputs.use_forks }}
+          TEMPLATE_CODEQL: ${{ inputs.template_codeql }}
+          TEMPLATE_SBOM: ${{ inputs.template_sbom }}
+          TEMPLATE_LICENSES: ${{ inputs.template_licenses }}
+          TEMPLATE_GRASS_MANUAL: ${{ inputs.template_grass_manual }}
+          TEMPLATE_GRASS_TEST: ${{ inputs.template_grass_test }}
+          TEMPLATE_LINTING: ${{ inputs.template_linting }}
+          TEMPLATE_POST_PR_REVIEWS: ${{ inputs.template_post_pr_reviews }}
+          TEMPLATE_PYTHON_PUBLISH: ${{ inputs.template_python_publish }}
+
+          TEMPLATE_SECURITY_MD: ${{ inputs.template_security_md }}
+          TEMPLATE_AGENTS_MD: ${{ inputs.template_agents_md }}
+          TEMPLATE_CONTRIBUTING_MD: ${{ inputs.template_contributing_md }}
+
+        shell: bash
+        run: |
+          read -r -a REPO_ARGS <<< "$REPOSITORIES"
+
+          ARGS=(--apply)
+          SELECTED_PROFILES=()
+          SELECTED_TEMPLATES=()
+
+          if [[ "$USE_FORKS" == "true" ]]; then
+            ARGS+=(--fork)
+          else
+            ARGS+=(--no-fork)
+          fi
+
+          case "$SELECTED_PROFILE" in
+            "None - Individual templates only") ;;
+            "General - "*) SELECTED_PROFILES+=(general) ;;
+            "GRASS - "*) SELECTED_PROFILES+=(grass) ;;
+            "Python - "*) SELECTED_PROFILES+=(python) ;;
+            "Quality - "*) SELECTED_PROFILES+=(quality) ;;
+            "Security - "*) SELECTED_PROFILES+=(security) ;;
+            "Collaboration - "*) SELECTED_PROFILES+=(collaboration) ;;
+            "All - "*) SELECTED_PROFILES+=(all) ;;
+            *)
+              echo "Error: Unknown profile: $SELECTED_PROFILE"
+              exit 1
+              ;;
+          esac
+
+          add_template_if_selected() {
+            if [[ "$1" == "true" ]]; then
+              SELECTED_TEMPLATES+=("$2")
+            fi
+          }
+
+          add_template_if_selected "$TEMPLATE_CODEQL" codeql
+          add_template_if_selected "$TEMPLATE_SBOM" sbom-vulnerability-scan
+          add_template_if_selected "$TEMPLATE_LICENSES" third-party-licenses
+          add_template_if_selected "$TEMPLATE_GRASS_MANUAL" grass-manual
+          add_template_if_selected "$TEMPLATE_GRASS_TEST" grass-test
+          add_template_if_selected "$TEMPLATE_LINTING" linting
+          add_template_if_selected "$TEMPLATE_POST_PR_REVIEWS" post-pr-reviews
+          add_template_if_selected "$TEMPLATE_PYTHON_PUBLISH" python-publish
+          add_template_if_selected "$TEMPLATE_SECURITY_MD" security-md
+          add_template_if_selected "$TEMPLATE_AGENTS_MD" agents-md
+          add_template_if_selected "$TEMPLATE_CONTRIBUTING_MD" contributing-md
+
+          if [[ ${#SELECTED_PROFILES[@]} -eq 0 && ${#SELECTED_TEMPLATES[@]} -eq 0 ]]; then
+            echo "Error: Select at least one profile or template."
+            exit 1
+          fi
+
+          if [[ ${#SELECTED_PROFILES[@]} -gt 0 ]]; then
+            PROFILES_CSV=$(IFS=,; echo "${SELECTED_PROFILES[*]}")
+            ARGS+=(--profiles "$PROFILES_CSV")
+          fi
+
+          if [[ ${#SELECTED_TEMPLATES[@]} -gt 0 ]]; then
+            TEMPLATES_CSV=$(IFS=,; echo "${SELECTED_TEMPLATES[*]}")
+            ARGS+=(--templates "$TEMPLATES_CSV")
+          fi
+
+          ./scripts/run_sync.sh "${ARGS[@]}" "${REPO_ARGS[@]}"

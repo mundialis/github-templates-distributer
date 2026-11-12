@@ -1,0 +1,157 @@
+# individual templates available for distribution
+templates:
+  codeql:
+    source: workflows/codeql.yml
+    destination: .github/workflows/codeql.yml
+    sync:
+      strategy: replace
+      if_missing: skip
+      detect_existing:
+        - github/codeql-action/analyze
+
+  grass-manual:
+    source: workflows/grass-manual.yml
+    destination: .github/workflows/grass-manual.yml
+    detect_by: mundialis/github-workflows/.github/workflows/grass-manual.yml
+    sync:
+      strategy: replace
+
+  grass-test:
+    source: workflows/grass-test.yml
+    destination: .github/workflows/grass-test.yml
+    detect_by: mundialis/github-workflows/.github/workflows/grass-tests.yml
+    sync:
+      strategy: replace
+
+  linting:
+    source: workflows/linting.yml
+    destination: .github/workflows/linting.yml
+    detect_by: mundialis/github-workflows/.github/workflows/linting.yml
+    sync:
+      strategy: merge
+      preserve:
+        - name
+        - "on"
+        - jobs.lint.permissions
+      merge_preserve_existing:
+        - jobs.lint.with
+
+  post-pr-reviews:
+    source: workflows/post-pr-reviews.yml
+    destination: .github/workflows/post-pr-reviews.yml
+    detect_by: mundialis/github-workflows/.github/workflows/post-pr-reviews.yml
+    sync:
+      strategy: replace
+
+  python-publish:
+    source: workflows/python-publish.yml
+    destination: .github/workflows/python-publish.yml
+    detect_by: mundialis/github-workflows/.github/workflows/python-publish.yml
+    sync:
+      strategy: replace
+      match_destination: true
+
+  sbom-vulnerability-scan:
+    source: workflows/sbom-vulnerability-scan.yml
+    detect_by: mundialis/github-workflows/.github/workflows/sbom-vulnerability-scan.yml
+    dependency_inputs:
+      - dockerfile
+      - requirements
+      - pyproject
+    preserve_inputs:
+      - dependency-track-project-name
+    sync:
+      strategy: parameterized
+
+  third-party-licenses:
+    source: workflows/third-party-licenses.yml
+    detect_by: mundialis/github-workflows/.github/workflows/third-party-licenses.yml
+    dependency_inputs:
+      - dockerfile
+      - requirements
+      - pyproject
+    sync:
+      strategy: parameterized
+
+  security-md:
+    source: common/SECURITY.md
+    destination: SECURITY.md
+    optional: true
+    sync:
+      strategy: file
+
+  agents-md:
+    source: common/AGENTS.md
+    destination: AGENTS.md
+    optional: true
+    sync:
+      strategy: file
+
+  contributing-md:
+    source: common/CONTRIBUTING.md
+    destination: CONTRIBUTING.md
+    optional: true
+    sync:
+      strategy: file
+
+# collections of templates
+profiles:
+  all:
+    templates:
+      - codeql
+      - grass-manual
+      - grass-test
+      - linting
+      - post-pr-reviews
+      - python-publish
+      - sbom-vulnerability-scan
+      - third-party-licenses
+      - security-md
+      - agents-md
+      - contributing-md
+
+  general:
+    templates:
+      - codeql
+      - linting
+      - sbom-vulnerability-scan
+      - third-party-licenses
+      - agents-md
+      - contributing-md
+
+  grass:
+    templates:
+      - codeql
+      - grass-manual
+      - grass-test
+      - linting
+      - sbom-vulnerability-scan
+      - third-party-licenses
+
+  python:
+    templates:
+      - codeql
+      - linting
+      - post-pr-reviews
+      - python-publish
+      - sbom-vulnerability-scan
+      - third-party-licenses
+
+  quality:
+    templates:
+      - codeql
+      - linting
+      - post-pr-reviews
+
+  security:
+    templates:
+      - codeql
+      - sbom-vulnerability-scan
+      - third-party-licenses
+      - security-md
+
+  collaboration:
+    templates:
+      - security-md
+      - agents-md
+      - contributing-md
